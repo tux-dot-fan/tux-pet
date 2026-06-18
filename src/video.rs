@@ -3,6 +3,12 @@ use std::ptr;
 
 use ffmpeg_sys_next as ff;
 
+struct SampledBg {
+    reference_g: u8,
+    target_cb: f64,
+    target_cr: f64,
+}
+
 pub struct VideoPlayer {
     fmt_ctx:    *mut ff::AVFormatContext,
     codec_ctx:  *mut ff::AVCodecContext,
@@ -16,6 +22,8 @@ pub struct VideoPlayer {
     rgba_buf:   Vec<u8>,
     done:       bool,
     reference_g: u8,
+    target_cb: f64,
+    target_cr: f64,
 }
 
 unsafe impl Send for VideoPlayer {}
@@ -58,7 +66,7 @@ impl VideoPlayer {
         frame_rgba: *mut ff::AVFrame,
         pkt: *mut ff::AVPacket,
         stream_idx: i32,
-    ) -> u8 {
+    ) -> SampledBg {
         unsafe {
             loop {
                 let ret = ff::av_read_frame(fmt_ctx, pkt);
@@ -98,10 +106,10 @@ impl VideoPlayer {
                 return sampled;
             }
         }
-        252
+        SampledBg { reference_g: 252, target_cb: 44.0, target_cr: 22.0 }
     }
 
-    fn sample_from_corners(rgba: &[u8], w: u32, h: u32) -> u8 {
+    fn sample_from_corners(rgba: &[u8], w: u32, h: u32) -> SampledBg {
         let corners = [
             (0, 0),
             (w.saturating_sub(10), 0),
@@ -109,6 +117,8 @@ impl VideoPlayer {
             (w.saturating_sub(10), h.saturating_sub(10)),
         ];
         let mut total_g: u32 = 0;
+        let mut total_cb: f64 = 0.0;
+        let mut total_cr: f64 = 0.0;
         let mut count: u32 = 0;
         for &(cx, cy) in &corners {
             for dy in 0..10u32 {
@@ -123,6 +133,13 @@ impl VideoPlayer {
                             let b = rgba[idx + 2] as u32;
                             if g > 50 && g > r && g > b {
                                 total_g += g;
+                                let rf = r as f64;
+                                let gf = g as f64;
+                                let bf = b as f64;
+                                let cb = 128.0 + (-0.168736 * rf - 0.331264 * gf + 0.5 * bf);
+                                let cr = 128.0 + (0.5 * rf - 0.418688 * gf - 0.081312 * bf);
+                                total_cb += cb;
+                                total_cr += cr;
                                 count += 1;
                             }
                         }
@@ -131,26 +148,37 @@ impl VideoPlayer {
             }
         }
         if count > 0 {
-            (total_g / count) as u8
+            SampledBg {
+                reference_g: (total_g / count) as u8,
+                target_cb: total_cb / count as f64,
+                target_cr: total_cr / count as f64,
+            }
         } else {
-            252
+            SampledBg { reference_g: 252, target_cb: 44.0, target_cr: 22.0 }
         }
     }
 
-    fn soft_matte(rgba: &mut [u8], reference_g: u8, _width: u32, _height: u32) {
-        let dist_threshold: f64 = 60.0;
-        let rg = reference_g as f64;
+    fn soft_matte(rgba: &mut [u8], target_cb: f64, target_cr: f64) {
+        let chroma_threshold: f64 = 40.0;
 
         for i in (0..rgba.len()).step_by(4) {
             let r = rgba[i] as f64;
             let g = rgba[i + 1] as f64;
             let b = rgba[i + 2] as f64;
 
-            let dist = (r * r + (g - rg) * (g - rg) + b * b).sqrt();
+            let cb = 128.0 + (-0.168736 * r - 0.331264 * g + 0.5 * b);
+            let cr = 128.0 + (0.5 * r - 0.418688 * g - 0.081312 * b);
 
-            // Only key out pixels that are very close to the reference green
-            // and are green-dominant. Cat pixels with any green contamination stay opaque.
-            if dist < dist_threshold && (g > r) && (g > b) {
+            let dcb = cb - target_cb;
+            let dcr = cr - target_cr;
+            let chroma_dist = (dcb * dcb + dcr * dcr).sqrt();
+
+            // Use only chroma (Cb, Cr) distance — independent of brightness.
+            // Pure green has very low Cb (around 43-45) and low Cr (around 22).
+            // Natural colors have Cb in 80-150 range, Cr in 130-180 range.
+            // This separates background from foreground reliably regardless of
+            // brightness or alpha blending at edges.
+            if chroma_dist < chroma_threshold {
                 rgba[i] = 0;
                 rgba[i + 1] = 0;
                 rgba[i + 2] = 0;
@@ -228,7 +256,7 @@ impl VideoPlayer {
             (*frame_rgba).data[0] = rgba_buf.as_mut_ptr();
             (*frame_rgba).linesize[0] = linesize;
 
-            let reference_g = Self::decode_first_frame_and_sample(&mut rgba_buf, fmt_ctx, codec_ctx, sws_ctx, frame, frame_rgba, pkt, stream_idx);
+            let sampled_bg = Self::decode_first_frame_and_sample(&mut rgba_buf, fmt_ctx, codec_ctx, sws_ctx, frame, frame_rgba, pkt, stream_idx);
 
             Some(VideoPlayer {
                 fmt_ctx, codec_ctx, sws_ctx, frame, frame_rgba, pkt,
@@ -236,7 +264,9 @@ impl VideoPlayer {
                 width: out_w, height: out_h,
                 rgba_buf,
                 done: false,
-                reference_g,
+                reference_g: sampled_bg.reference_g,
+                target_cb: sampled_bg.target_cb,
+                target_cr: sampled_bg.target_cr,
             })
         }
     }
@@ -285,7 +315,7 @@ impl VideoPlayer {
                 );
                 ff::av_frame_unref(self.frame);
 
-                Self::soft_matte(&mut self.rgba_buf, self.reference_g, self.width, self.height);
+                Self::soft_matte(&mut self.rgba_buf, self.target_cb, self.target_cr);
                 return Some(&self.rgba_buf);
             }
         }
