@@ -138,7 +138,7 @@ impl VideoPlayer {
     }
 
     fn soft_matte(rgba: &mut [u8], reference_g: u8, _width: u32, _height: u32) {
-        let dist_threshold: f64 = 30.0;
+        let dist_threshold: f64 = 60.0;
         let rg = reference_g as f64;
 
         for i in (0..rgba.len()).step_by(4) {
