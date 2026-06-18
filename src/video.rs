@@ -137,22 +137,56 @@ impl VideoPlayer {
         }
     }
 
-    fn soft_matte(rgba: &mut [u8], reference_g: u8) {
-        let tolerance: f64 = 80.0;
+    fn soft_matte(rgba: &mut [u8], reference_g: u8, width: u32, height: u32) {
+        let dist_threshold: f64 = 80.0;
         let rg = reference_g as f64;
+        let w = width as usize;
+        let h = height as usize;
 
-        for i in (0..rgba.len()).step_by(4) {
+        // First pass: classify each pixel as background (1) or foreground (0)
+        let mut mask: Vec<u8> = vec![0; rgba.len() / 4];
+        for (idx, m) in mask.iter_mut().enumerate() {
+            let i = idx * 4;
             let r = rgba[i] as f64;
             let g = rgba[i + 1] as f64;
             let b = rgba[i + 2] as f64;
-
             let dist = (r * r + (g - rg) * (g - rg) + b * b).sqrt();
+            let is_bg = dist < dist_threshold && (rgba[i + 1] as u32) > (rgba[i] as u32) && (rgba[i + 1] as u32) > (rgba[i + 2] as u32);
+            *m = if is_bg { 1 } else { 0 };
+        }
 
-            let r = rgba[i];
-            let g = rgba[i + 1];
-            let b = rgba[i + 2];
+        // Second pass: for each pixel, count background vs foreground in a 5x5 neighborhood
+        // alpha = (1 - bg_ratio) * 255
+        let radius: i32 = 2;
+        let mut new_alpha = vec![0u8; rgba.len() / 4];
 
-            if dist < tolerance && g > r && g > b {
+        for y in 0..h {
+            for x in 0..w {
+                let idx = y * w + x;
+                let mut bg_count = 0;
+                let mut total = 0;
+                for dy in -radius..=radius {
+                    for dx in -radius..=radius {
+                        let nx = x as i32 + dx;
+                        let ny = y as i32 + dy;
+                        if nx >= 0 && nx < w as i32 && ny >= 0 && ny < h as i32 {
+                            let nidx = (ny as usize) * w + (nx as usize);
+                            bg_count += mask[nidx] as i32;
+                            total += 1;
+                        }
+                    }
+                }
+                let bg_ratio = bg_count as f64 / total as f64;
+                // bg_ratio=1: fully background → alpha=0
+                // bg_ratio=0: fully foreground → alpha=255
+                new_alpha[idx] = ((1.0 - bg_ratio) * 255.0) as u8;
+            }
+        }
+
+        // Apply: background pixels get all 4 channels zeroed, foreground pixels keep RGB
+        for (idx, &alpha) in new_alpha.iter().enumerate() {
+            let i = idx * 4;
+            if alpha < 128 {
                 rgba[i] = 0;
                 rgba[i + 1] = 0;
                 rgba[i + 2] = 0;
@@ -287,7 +321,7 @@ impl VideoPlayer {
                 );
                 ff::av_frame_unref(self.frame);
 
-                Self::soft_matte(&mut self.rgba_buf, self.reference_g);
+                Self::soft_matte(&mut self.rgba_buf, self.reference_g, self.width, self.height);
                 return Some(&self.rgba_buf);
             }
         }
