@@ -8,8 +8,11 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 override_dh_auto_build:
 	@echo "Binary already built, skipping cargo build"
 
+override_dh_auto_install:
+	@echo "Binary already built, skipping install"
+
 override_dh_auto_test:
 	true
 
 override_dh_auto_clean:
-	cargo clean
+	@echo "Skipping clean - binary already exists"

@@ -41,6 +41,13 @@ jobs:
           cp assets/pet/tux/tux-pet.desktop AppDir/tux-pet.desktop 2>/dev/null || true
           appimage-builder --recipe AppImageBuilder.yml --skip-tests
 
+      - name: Prepare deb
+        run: |
+          mkdir -p debian/tux-pet/usr/bin
+          mkdir -p debian/tux-pet/usr/share/tux-pet
+          cp target/release/tux-pet debian/tux-pet/usr/bin/
+          cp -r assets/pet debian/tux-pet/usr/share/tux-pet/
+
       - name: Build deb
         run: |
           sudo apt-get install -y dpkg-dev fakeroot
