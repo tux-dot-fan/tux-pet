@@ -141,12 +141,9 @@ fn load_all_characters() -> Vec<LoadedCharacter> {
                         frames,
                         ticks_per_frame: *ticks_per_frame,
                     });
-                } else {
-                    tux_log!("[pet] skipped animation {} - failed to read frames: {:?}", anim_def.id, frame_paths);
                 }
             }
         }
-        tux_log!("[pet] loaded character {} with {} animations: {:?}", char_def.id, animations.len(), animations.keys().collect::<Vec<_>>());
         LoadedCharacter { id: char_def.id.clone(), animations }
     }).collect()
 }
@@ -483,7 +480,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 settings_win.sel_anim = i;
                                 if let Some(c) = shared::all_characters().get(settings_win.sel_char) {
                                     if let Some(a) = c.animations.get(i) {
-                                        if characters.iter().find(|lc| lc.id == c.id).and_then(|lc| lc.animations.get(&a.id)).is_some() {
+                                        let is_frames = matches!(a.kind, shared::AnimationKind::Frames { .. });
+                                        let can_use = if is_frames {
+                                            characters.iter().find(|lc| lc.id == c.id).and_then(|lc| lc.animations.get(&a.id)).is_some()
+                                        } else {
+                                            true
+                                        };
+                                        if can_use {
                                             config.lock().unwrap().animation = a.id.clone();
                                         } else {
                                             tux_log!("[pet] rejected animation {} for {} - frame files not loaded", a.id, c.id);
