@@ -313,8 +313,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             match msg {
                                 tungstenite::Message::Text(text) => {
                                     if let Ok(new_cfg) = serde_json::from_str::<shared::PetConfig>(&text) {
-                                        tux_log!("[pet] received config: {:?} / {:?}", new_cfg.character, new_cfg.animation);
-                                        *config.lock().unwrap() = new_cfg;
+                                        let chars = shared::all_characters();
+                                        let char_valid = chars.iter().any(|c| c.id == new_cfg.character);
+                                        let anim_valid = chars.iter()
+                                            .find(|c| c.id == new_cfg.character)
+                                            .map(|c| c.animations.iter().any(|a| a.id == new_cfg.animation))
+                                            .unwrap_or(false);
+                                        if char_valid && anim_valid {
+                                            tux_log!("[pet] received config: {:?} / {:?}", new_cfg.character, new_cfg.animation);
+                                            *config.lock().unwrap() = new_cfg;
+                                        } else {
+                                            tux_log!("[pet] rejected invalid config: {:?} / {:?}", new_cfg.character, new_cfg.animation);
+                                        }
                                     } else {
                                         tux_log!("[pet] parse error: {}", text);
                                     }
