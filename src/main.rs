@@ -622,7 +622,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if pet_state.animation_ticks_left == 0 && last_auto_anim_switch > 0 {
             last_auto_anim_switch = 0;
-            config.lock().unwrap().animation = pet_state.current_animation.clone();
+            // Validate animation exists for current character before applying
+            let current_char_def = shared::all_characters()
+                .iter()
+                .find(|c| c.id == current_config.character);
+            if let Some(c) = current_char_def {
+                if c.animations.iter().any(|a| a.id == pet_state.current_animation) {
+                    config.lock().unwrap().animation = pet_state.current_animation.clone();
+                }
+            }
         }
 
         if pet_state.animation_ticks_left == 0 && last_auto_anim_switch == 0 {
