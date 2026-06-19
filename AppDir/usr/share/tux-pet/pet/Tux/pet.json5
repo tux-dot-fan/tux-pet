@@ -1,0 +1,45 @@
+{
+  name: "Tux1",
+  avatar: "avatar.png",
+  animations: [
+    { id: "dance", name: "跳舞", type: "video", video_file: "跳舞.mp4" },
+    { id: "talk",  name: "说话", type: "video", video_file: "说话.mp4" },
+  ],
+  rules: [
+    // 启动时随机选一个
+    { trigger_type: { type: "idle", min_ticks: 0, max_ticks: 50 },
+      animation: "dance", weight: 1.0, duration_ticks: 300 },
+
+    // 空闲时随机切换
+    { trigger_type: { type: "idle", min_ticks: 400, max_ticks: 2000 },
+      animation: "dance", weight: 2.0, duration_ticks: 400, cooldown_ticks: 1500 },
+    { trigger_type: { type: "idle", min_ticks: 400, max_ticks: 2000 },
+      animation: "talk", weight: 2.0, duration_ticks: 350, cooldown_ticks: 1500 },
+
+    // 心情好时跳舞
+    { trigger_type: { type: "state", state: "mood", op: "gt", value: 70.0 },
+      animation: "dance", weight: 3.0, duration_ticks: 400, cooldown_ticks: 2000 },
+
+    // 心情不好时说话吐槽
+    { trigger_type: { type: "state", state: "mood", op: "lt", value: 40.0 },
+      animation: "talk", weight: 3.0, duration_ticks: 350, cooldown_ticks: 1500 },
+
+    // 精力低时安静说话
+    { trigger_type: { type: "state", state: "energy", op: "lt", value: 30.0 },
+      animation: "talk", weight: 2.0, duration_ticks: 300, cooldown_ticks: 1500 },
+
+    // 白天活跃，跳舞多
+    { trigger_type: { type: "time", hour_start: 9, hour_end: 18 },
+      animation: "dance", weight: 2.5, duration_ticks: 400, cooldown_ticks: 1500 },
+
+    // 晚上安静点，多说话
+    { trigger_type: { type: "time", hour_start: 19, hour_end: 22 },
+      animation: "talk", weight: 2.5, duration_ticks: 350, cooldown_ticks: 1500 },
+
+    // 随机切换增加变化
+    { trigger_type: { type: "random", chance_per_tick: 0.0002 },
+      animation: "dance", weight: 1.0, duration_ticks: 300, cooldown_ticks: 1000 },
+    { trigger_type: { type: "random", chance_per_tick: 0.0002 },
+      animation: "talk", weight: 1.0, duration_ticks: 250, cooldown_ticks: 1000 },
+  ],
+}

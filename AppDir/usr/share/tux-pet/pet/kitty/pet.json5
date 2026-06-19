@@ -1,0 +1,76 @@
+{
+  name: "Kitty",
+  avatar: "avatar.png",
+  animations: [
+    { id: "idle",              name: "呆着",        type: "video", video_file: "idle.mp4" },
+    { id: "catch_butterfly",   name: "捉蝴蝶",       type: "video", video_file: "捉蝴蝶.mp4" },
+    { id: "lie_down",          name: "趴下",        type: "video", video_file: "趴下.mp4" },
+    { id: "run_away",          name: "跑开",        type: "video", video_file: "runaway.mp4" },
+    { id: "block",             name: "遮屏幕",       type: "video", video_file: "遮挡屏幕.mp4" },
+    { id: "give_fish",         name: "送鱼干",       type: "video", video_file: "give_fish.mp4" },
+    { id: "catch_butterfly2",  name: "跳捉蝴",       type: "video", video_file: "跳捉蝴.mp4" },
+    { id: "type_keyboard",     name: "拍键盘",       type: "video", video_file: "拍键盘.mp4" },
+    { id: "scratch1",          name: "挠痒 1",      type: "video", video_file: "挠痒1.mp4" },
+    { id: "scratch2",          name: "挠痒 2",      type: "video", video_file: "挠痒2.mp4" },
+    { id: "play_yarn",         name: "玩毛线球",     type: "video", video_file: "玩毛线球.mp4" },
+    { id: "lick_paw",          name: "舔手",        type: "video", video_file: "舔手.mp4" },
+  ],
+  rules: [
+    // 刚启动时随机选择
+    { trigger_type: { type: "idle", min_ticks: 0, max_ticks: 100 },
+      animation: "catch_butterfly", weight: 2.0, duration_ticks: 300 },
+    { trigger_type: { type: "idle", min_ticks: 0, max_ticks: 100 },
+      animation: "play_yarn", weight: 2.0, duration_ticks: 400 },
+
+    // 空闲时随机播放不同动画
+    { trigger_type: { type: "idle", min_ticks: 400, max_ticks: 1500 },
+      animation: "catch_butterfly", weight: 3.0, duration_ticks: 300, cooldown_ticks: 1500 },
+    { trigger_type: { type: "idle", min_ticks: 600, max_ticks: 2500 },
+      animation: "play_yarn", weight: 3.0, duration_ticks: 400, cooldown_ticks: 1500 },
+    { trigger_type: { type: "idle", min_ticks: 800, max_ticks: 3000 },
+      animation: "lie_down", weight: 2.0, duration_ticks: 400, cooldown_ticks: 2000 },
+    { trigger_type: { type: "idle", min_ticks: 1000, max_ticks: 3500 },
+      animation: "scratch1", weight: 2.5, duration_ticks: 250, cooldown_ticks: 1500 },
+    { trigger_type: { type: "idle", min_ticks: 1000, max_ticks: 3500 },
+      animation: "scratch2", weight: 2.5, duration_ticks: 250, cooldown_ticks: 1500 },
+    { trigger_type: { type: "idle", min_ticks: 1200, max_ticks: 4000 },
+      animation: "lick_paw", weight: 1.8, duration_ticks: 200, cooldown_ticks: 2000 },
+    { trigger_type: { type: "idle", min_ticks: 1500, max_ticks: 5000 },
+      animation: "block", weight: 1.5, duration_ticks: 250, cooldown_ticks: 3000 },
+
+    // 饥饿时送鱼
+    { trigger_type: { type: "state", state: "hunger", op: "gt", value: 70.0 },
+      animation: "give_fish", weight: 5.0, duration_ticks: 300, cooldown_ticks: 3000 },
+
+    // 精力低时趴下休息
+    { trigger_type: { type: "state", state: "energy", op: "lt", value: 30.0 },
+      animation: "lie_down", weight: 4.0, duration_ticks: 500, cooldown_ticks: 2000 },
+
+    // 心情好时玩耍（毛线球/挠痒/拍键盘）
+    { trigger_type: { type: "state", state: "mood", op: "gt", value: 80.0 },
+      animation: "play_yarn", weight: 3.0, duration_ticks: 400, cooldown_ticks: 2000 },
+    { trigger_type: { type: "state", state: "mood", op: "gt", value: 90.0 },
+      animation: "scratch1", weight: 2.5, duration_ticks: 250, cooldown_ticks: 1500 },
+    { trigger_type: { type: "state", state: "mood", op: "gt", value: 90.0 },
+      animation: "scratch2", weight: 2.5, duration_ticks: 250, cooldown_ticks: 1500 },
+
+    // 心情不好时舔手安抚自己
+    { trigger_type: { type: "state", state: "mood", op: "lt", value: 30.0 },
+      animation: "lick_paw", weight: 3.0, duration_ticks: 250, cooldown_ticks: 2000 },
+
+    // 晚上时间多趴着
+    { trigger_type: { type: "time", hour_start: 22, hour_end: 6 },
+      animation: "lie_down", weight: 3.0, duration_ticks: 600, cooldown_ticks: 3000 },
+
+    // 上午时间精神好，偶尔拍键盘
+    { trigger_type: { type: "time", hour_start: 9, hour_end: 12 },
+      animation: "type_keyboard", weight: 2.0, duration_ticks: 350, cooldown_ticks: 4000 },
+
+    // 随机小概率跳捉蝴蝶
+    { trigger_type: { type: "random", chance_per_tick: 0.0001 },
+      animation: "catch_butterfly2", weight: 2.0, duration_ticks: 200 },
+    // 偶尔心血来潮遮屏幕
+    { trigger_type: { type: "random", chance_per_tick: 0.00005 },
+      animation: "block", weight: 1.0, duration_ticks: 300 },
+  ],
+}
